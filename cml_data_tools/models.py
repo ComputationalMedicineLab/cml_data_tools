@@ -10,6 +10,29 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 
 def clusters_to_components(clusters, n=2000):
+    """Converts the data format produced by `clustering.iter_clusters` into a
+    format usable for extracting the cluster centers from the IcaPhenotypeModel
+    models contained in a given clustering.
+
+    Arguments
+    ---------
+    clusters : Iterable
+        An iterable of 3-tuples such as those yielded by `iter_clusters` in
+        `clustering.py`. Only the exemplar from each 3-tuple is used.
+    n : int, default=2000
+        The number of phenotypes requested per IcaPhenotypeModel in the
+        clustering. This is used to decompose each exemplar extracted from
+        `clusters` into a submodel number and component number. I.e., if n is
+        2000 and the exemplar is 5500, then the exemplar is the 500th phenotype
+        in the third model.
+
+    Returns
+    -------
+    A list of arrays of component indices. Each array in the list contains all
+    exemplars present in its submodel from the clustering; i.e. if the first
+    element is `np.array([0, 4, 99])` then `model_0` contains cluster centers
+    (exemplars) at those indices (`model.phenotypes_.iloc[:, indices]`).
+    """
     # clusters is an iterable of 3-tuples as from `iter_clusters` in
     # cml_data_tools/clustering.py
     exemplars = np.sort(np.array([x[-1] for x in clusters]))
@@ -57,6 +80,18 @@ class AggregateIcaModel:
         """
         Produces an array of appropriate identifiers for the phenotypes
         identified by model_id `m` and column indices `ids`
+
+        Arguments
+        ---------
+        m : str
+            The model number (zero-indexed).
+        ids : np.array[int]
+            A list of indices
+
+        Returns
+        -------
+        An ndarray containing strings of the format `fM{m:03}-P{c:04}` for `c`
+        in `ids`.
         """
         return np.array([f'M{m:03}-P{c:04}' for c in ids])
 
@@ -75,7 +110,8 @@ class AggregateIcaModel:
             A pandas dataframe with rows corresponding to (and indexed the same
             as) rows in X, and columns corresponding to the aggregated
             phenotypes. Since the exemplar names may not be unique across the
-            submodels, the columns are *renamed* from the original
+            submodels, the columns are *renamed* from the original. The
+            renaming function is given in `AggregateIcaModel.ids_to_names`.
             Each cell contains the amount of the given phenotype expressed by
             the row of X.
         """
