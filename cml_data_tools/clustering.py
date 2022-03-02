@@ -71,7 +71,27 @@ def make_affinity_matrix(phenotypes):
 
 
 def iter_clusters(matrix, labels):
-    """Iterates tuples of (cluster submatrix, cluster indices)"""
+    """Produces a generator of 3-tuples, (submatrix, indices, exemplar). The
+    submatrix is the cluster's submatrix of the affinity matrix, the indices
+    are the row and column indices into the affinity matrix which produce the
+    submatrix, and the exemplar is the index of the cluster's exemplar.
+
+    Arguments
+    ---------
+    matrix : np.ndarray
+        An affinity matrix.
+    labels : np.array
+        An array of exemplars in index order of the affinity matrix. I.e., if
+        the third phenotype in the affinity matrix is in a cluster whose center
+        is 100, then the third element of the labels array is 100.
+
+    Yields
+    ------
+    3-tuples, (submatrix, indices, exemplar). Each triplet defines a cluster:
+    the cluster's submatrix of the affinity matrix, the cluster's component
+    indices in the affinity matrix, and the index of the cluster exemplar (or
+    cluster center).
+    """
     labelset = np.unique(labels)
     #assert (labelset == np.arange(len(labelset))).all(), labelset
     for center in labelset:
