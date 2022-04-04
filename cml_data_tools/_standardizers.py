@@ -228,7 +228,7 @@ class AffineTransform:
     def inverse_transform(self, x):
         y = (self.scale * x) + self.shift
         if self.log:
-            return np.power(10, y) - eps
+            return np.power(10, y) - self.eps
         return y
 
 

@@ -17,13 +17,15 @@ class Config:
     curve_kws : dict
     std_cls : class
     std_kws : dict
+    std_params : dict
         All default to None, so that instances may be instantiated but then
         passed around different for configuration from other sources
     """
     def __init__(self, mode,
                  data=None, meta=None,
                  curve_cls=None, std_cls=None,
-                 curve_kws=None, std_kws=None):
+                 curve_kws=None, std_kws=None,
+                 std_params=None):
         self.mode = mode
         self.data = data
         self.meta = meta
@@ -31,6 +33,7 @@ class Config:
         self.curve_kws = {} if curve_kws is None else curve_kws
         self.std_cls = std_cls
         self.std_kws = {} if std_kws is None else std_kws
+        self.std_params = {} if std_params is None else std_params
 
     def __str__(self):
         return f'Config(mode={self.mode})'

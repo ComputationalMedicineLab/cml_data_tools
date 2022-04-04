@@ -22,6 +22,7 @@ from cml_data_tools.source_ehr import (make_data_df, make_meta_df,
 from cml_data_tools.online_standardizer import (collect_curve_stats,
                                                 update_curve_stats,
                                                 OnlineCurveStandardizer)
+from cml_data_tools._standardizers import CurveStats, Standardizer
 
 
 def _drain_queue(q, timeout=None):
@@ -36,7 +37,7 @@ def _drain_queue(q, timeout=None):
 def _worker(df, spec, resolution, calc_stats):
     curves = build_patient_curves(df, spec, resolution)
     if calc_stats:
-        stats = collect_curve_stats(curves)
+        stats = CurveStats.from_curves(curves)
     else:
         stats = None
     return curves, stats
@@ -416,9 +417,11 @@ class Experiment:
 
         if calc_stats:
             def intercept_stats(curves_iter):
-                stats = None
+                curves_iter = iter(curves_iter)
+                curves, stats = next(curves_iter)
+                yield curves
                 for curves, new_stats in curves_iter:
-                    stats = update_curve_stats(stats, new_stats)
+                    stats = stats.merge(new_stats)
                     yield curves
                 self.cache.set(curve_stats_key, stats)
             # Wrap the generator in another generator;
@@ -516,9 +519,14 @@ class Experiment:
         stats_key : str
             Default 'curve_stats'. Key for already computed curve stats.
         """
-        stats = self.cache.get(stats_key)
-        std = OnlineCurveStandardizer(curve_stats=stats, configs=self.configs)
-        std.fit()
+        mode_params = {}
+        for cfg in self.configs:
+            mode_params[cfg.mode] = {k:v for k, v in cfg.std_params.items()}
+
+        curve_stats = self.cache.get(stats_key)
+        n_instances = self.cache.get('n_instances')
+
+        std = Standardizer(mode_params, curve_stats, n_instances)
         self.cache.set(key, std)
 
     @cached_operation
