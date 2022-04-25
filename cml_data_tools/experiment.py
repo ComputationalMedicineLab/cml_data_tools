@@ -19,10 +19,7 @@ from cml_data_tools.models import IcaPhenotypeModel
 from cml_data_tools.pickle_cache import PickleCache
 from cml_data_tools.source_ehr import (make_data_df, make_meta_df,
                                        aggregate_data, aggregate_meta)
-from cml_data_tools.online_standardizer import (collect_curve_stats,
-                                                update_curve_stats,
-                                                OnlineCurveStandardizer)
-from cml_data_tools._standardizers import CurveStats, Standardizer
+from cml_data_tools.standardizers import CurveStats, Standardizer
 
 
 def _drain_queue(q, timeout=None):
@@ -443,25 +440,6 @@ class Experiment:
         self.cache.set_stream(key, curves_iter)
 
     @cached_operation
-    def compute_curve_stats(self, key='curve_stats', curves_key='curves'):
-        """Calculate curve statistics on existing curves. Runs in serial
-        (i.e. slowly). It is faster to generate stats during curve generation.
-
-        Keyword Arguments
-        -----------------
-        key : str
-            Default 'curve_stats'. Key for generated curve statistics.
-        curves_key : str
-            Default 'curves'. Key for curves to generate stats on.
-        """
-        curves = self.cache.get_stream(curves_key)
-        stats = collect_curve_stats(next(curves))
-        for curveset in curves:
-            new = collect_curve_stats(curveset)
-            stats = update_curve_stats(stats, new)
-        self.cache.set(key, stats)
-
-    @cached_operation
     def compute_cross_sections(self, key='curve_xs',
                                curves_key='curves',
                                density=1/365,
@@ -509,13 +487,12 @@ class Experiment:
 
     @cached_operation
     def make_standardizer(self, key='standardizer', stats_key='curve_stats'):
-        """Instantiate and fit an OnlineCurveStandardizer.
+        """Instantiate and fit a Standardizer.
 
         Keyword Arguments
         -----------------
         key : str
-            Default 'standardizer'. Key for the OnlineCurveStandardizer
-            instance.
+            Default 'standardizer'. Key for the Standardizer instance.
         stats_key : str
             Default 'curve_stats'. Key for already computed curve stats.
         """
