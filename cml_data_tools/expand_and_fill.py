@@ -3,6 +3,30 @@ import pandas as pd
 
 
 def expand_and_fill_cross_sections(meta, standardizer, cross_sections):
+    """Merges the cross sections present in `cross_sections` using the metadata
+    and standardization functions in `meta` and `standardizer`.
+
+    Arguments
+    ---------
+    meta : pandas.DataFrames
+        A dataframe with columns 'mode', 'channel', 'description', and 'fill',
+        giving the fill values for each channel.
+    standardizer : cml_data_tools.standardizers.Standardizer
+        A Standardizer or compatible object with a `transform` function and
+        `curve_stats` attribute containing channel names and statistics.
+    cross_sections : Iterator[pandas.DataFrames]
+        A finite iterator of dataframes indexed by patient ID and date, with
+        (mode, channel) columns. No two need have any channels in common.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A single dataframe containing rows for all patient id, date pairs in
+        the input cross sections and columns for all channels in the input
+        cross sections, as if produced by pandas `merge`. Anywhere a channel is
+        not present in a patient's data the missing values have been filled
+        using `meta`.  All values are standardized using the `standardizer`.
+    """
     # XXX: This work is bundled into subroutines to (a) keep clean namespaces,
     # but also (b) so that we can easily jettison namespaces (and hence
     # references) and not keep the entire chain of partial products in memory
