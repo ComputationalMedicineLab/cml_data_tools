@@ -15,6 +15,7 @@ import pandas as pd
 from cml_data_tools.curves import build_patient_curves
 from cml_data_tools.clustering import (make_affinity_matrix, iter_clusters,
                                        AffinityPropagationClusterer)
+from cml_data_tools.expand_and_fill import expand_and_fill_cross_sections
 from cml_data_tools.models import IcaPhenotypeModel
 from cml_data_tools.pickle_cache import PickleCache
 from cml_data_tools.source_ehr import (make_data_df, make_meta_df,
@@ -65,74 +66,6 @@ def _binomial_curve_sample(curves, density, rng=np.random.default_rng()):
     n = rng.binomial(len(curves.index), density)
     if n > 0:
         return curves.sample(n=n)
-
-
-def _fast_reindex(df, channels):
-    # 6x faster than df.reindex
-    base = np.full((len(df), len(channels)), np.nan, dtype=np.float64)
-    _, _, idx = np.intersect1d(df.columns, channels,
-                               assume_unique=True,
-                               return_indices=True)
-    base[:, idx] = df.values
-    return df.index.values, base
-
-
-def _fast_fill_and_expand(dfs, channels):
-    # Much, much faster than pd.concat
-    index_parts = []
-    dense_parts = []
-    for df in dfs:
-        index, dense = _fast_reindex(df, channels)
-        index_parts.append(index)
-        dense_parts.append(dense)
-    indices = np.concatenate(index_parts)
-    names = df.index.names
-    index = pd.MultiIndex.from_tuples(indices, names=names)
-    values = np.concatenate(dense_parts)
-    matrix = pd.DataFrame(values, index=index, columns=channels)
-    return matrix
-
-
-def _build_std_matrix(meta, cross_sections, standardizer, return_dense=True):
-    meta = meta.set_index(['mode', 'channel'])
-    # An error such as
-    #   "TypeError: loop of ufunc does not support argument 0 of type"
-    #   "float which has no callable log10 method"
-    # Indicates that the series in the fill df have dtype "object,"
-    # they need to have a float dtype.
-    meta.fill = meta.fill.astype(np.float64)
-    # A KeyError during the standardization process indicates that we have
-    # channels in the metadata not present in the actual patient data curves;
-    # here we select only meta for channels which exist
-    channels = list(standardizer.curve_stats.channels)
-    channels = pd.MultiIndex.from_tuples(channels, names=['mode', 'channel'])
-    meta = meta.loc[channels]
-    # Use the actual channels from the patient data to reindex the cross
-    # sections and then build the full, dense data matrix. The size of dense
-    # should be [num cross sections, num channels across all patient data]
-    dense = _fast_fill_and_expand(cross_sections, channels)
-#    dense = []
-#    for df in cross_sections:
-#        df = df.reindex(columns=channels)
-#        dense.append(df)
-#    dense = pd.concat(dense, copy=False)
-    if return_dense:
-        orig = dense.copy()
-    # Standardize the data matrix, then the fill values, then use the fill
-    # values to remove all NaN from the standardized data matrix
-    std_matrix = standardizer.transform(dense)
-    fill = pd.DataFrame(meta.fill).transpose()
-    fill, _ = fill.align(std_matrix, join='right', axis=1)
-    # Remove any duplicated channels (may happen if source data has two
-    # descriptions for the same mode/channel pair, for example)
-    # XXX: make sure this only removes the duplicate and not both
-    # fill = fill.loc[:, ~fill.columns.duplicated()]
-    fill = standardizer.transform(fill)
-    fill = fill.loc['fill']
-    std_matrix = std_matrix.fillna(fill)
-    if return_dense:
-        return orig, std_matrix
-    return std_matrix
 
 
 def _to_data_matrix(meta, cross_sections):
@@ -508,10 +441,9 @@ class Experiment:
 
     @cached_operation
     def build_standardized_data_matrix(self, key='std_matrix',
-                                       dense_key='data_matrix',
                                        meta_key='meta',
-                                       xs_key='curve_xs', std_key='standardizer',
-                                       save_dense=True):
+                                       xs_key='curve_xs',
+                                       std_key='standardizer'):
         """Merges a set of dataframes with heterogeneous column labels into a
         single dataframe. Prunes the column labels by what actually exists in
         the curve data (taken from the fit standardizer), and then finally
@@ -522,29 +454,17 @@ class Experiment:
         key : str
             Default 'std_matrix'. Key for the final merged, standardized, and
             filled dataframe.
-        dense_key : str
-            Default 'data_matrix'. Key for merged dataframe. Cf `save_dense`.
         meta_key : str
             Default 'meta'. Key for the column label metadata.
         xs_key : str
             Default 'curve_xs'. Key for the stream of dataframes to merge.
         std_key : str
             Default 'standardizer'. Key for a fitted standardizer instance.
-        save_dense : bool
-            Default True. If True, then this step saves the unstandardized,
-            unfilled data matrix in the cache using `dense_key` as the key.
-            This can be useful for manually inspecting the merged data prior to
-            filling and standardizing.
         """
         meta = self.cache.get(meta_key)
-        cross_sections = self.cache.get_stream(xs_key)
         std = self.cache.get(std_key)
-        if save_dense:
-            dense, matrix = _build_std_matrix(meta, cross_sections, std)
-            self.cache.set(dense_key, dense)
-        else:
-            matrix = _build_std_matrix(meta, cross_sections, std,
-                                       return_dense=False)
+        cross_sections = self.cache.get_stream(xs_key)
+        matrix = expand_and_fill_cross_sections(meta, std, cross_sections)
         self.cache.set(key, matrix)
 
     @cached_operation
@@ -594,6 +514,7 @@ class Experiment:
     @cached_operation
     def learn_model(self, key='model',
                     train_data_key='std_matrix',
+                    drop_cols=None,
                     **model_kws):
         """Instantiate and fit an IcaPhenotypeModel from preprocessed data.
 
@@ -603,11 +524,16 @@ class Experiment:
             Default 'model'. Key for the fit model.
         train_data_key : str
             Default 'std_matrix'. Key for a processed, standardized dataframe.
+        drop_cols : list
+            Default None. If given, a list of channels in the data to exclude
+            from the phenotype model training.
         **kwargs
             All other kwargs are forwarded to IcaPhenotypeModel at
             instantiation.
         """
         data = self.cache.get(train_data_key)
+        if drop_cols is not None:
+            data = data.drop(drop_cols, axis=1)
         model = IcaPhenotypeModel(**model_kws)
         model.fit(data)
         self.cache.set(key, model)
