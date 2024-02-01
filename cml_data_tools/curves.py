@@ -36,8 +36,8 @@ def build_patient_curves(df, spec, resolution='D'):
         specify this. (Default 'D', which gives one - day resolution.)
     """
     ptid = df.ptid.values[0]
-    grid = pd.date_range(df.date.min().floor('D'),
-                         df.date.max().ceil('D'),
+    grid = pd.date_range(df.date.min().floor(resolution),
+                         df.date.max().ceil(resolution),
                          freq=resolution)
 
     curves = {}
@@ -271,7 +271,6 @@ class IntensityCurveBuilder(CurveBuilder):
             An ndarray of event intensities the same length as `grid`.
 
         """
-
         # create bin boundaries in units of days such that grid values are the
         # bin midpoints
         delta = grid[1] - grid[0]
@@ -425,8 +424,9 @@ class FuzzedBinaryCurveBuilder(BinaryCurveBuilder):
 
     def _build_single_curve(self, data, grid, **kwargs):
         freqstr = grid.freqstr
-        all_dates = kwargs.pop('all_dates').round(freqstr).unique()
-        dates = data.index.round(freqstr).unique()
+        all_dates = kwargs.pop('all_dates')
+        all_dates = all_dates.round(freqstr).unique().sort_values()
+        dates = data.index.round(freqstr).unique().sort_values()
 
         # Basic curve imputation - uses fill between
         curve = pd.Series(1.0, index=dates)
