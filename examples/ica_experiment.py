@@ -72,7 +72,7 @@ configs = [
     Config(
         mode='Age',
         data=DataSource('cml_test_age', sd_access.connect),
-        meta=(('age', 'Age', 0), ),
+        meta=(('Age', 'Age', 0), ),
         curve_cls=AgeCurveBuilder,
         std_cls=GelmanStandardizer,
     ),
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     N_MODEL = 5
     N_PHENT = 500
     project_name = 'E_05'
-    loc = f'/hd1/stilljm/cml_tests/{project_name}'
+    loc = f'./{project_name}'
 
     logging.basicConfig(filename=f'ICA_{project_name}.log',
                         format='%(asctime)s %(name)s %(message)s',

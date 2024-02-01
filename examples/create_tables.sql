@@ -1,5 +1,4 @@
--- SQL for creating the tables used in the ICA example script
--- Specific to LASKO_OMOP_SD
+-- SQL for creating the example tables used in the ICA example script
 
 DROP TABLE cml_test_measurement IF EXISTS;
 DROP TABLE cml_test_measurement_meta IF EXISTS;
