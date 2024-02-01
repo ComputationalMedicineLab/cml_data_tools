@@ -121,7 +121,7 @@ class PhenotypePlotter:
     def generate_labels(self, phenotype, trunc_at=100):
         """Generate labels for the given phenotype series"""
         labels = []
-        for c, val in phenotype.iteritems():
+        for c, val in phenotype.items():
             ex = self.standardizer.inverse_transform_label(c, val, spec='+.3g')
             impact = f'{ex}'
             desc = self.get_stripped_label_description(c, trunc_at)
@@ -167,7 +167,7 @@ class PhenotypePlotter:
         inset = inset_axes(ax, width=1.5, height=1.0, loc=3, borderpad=1.5)
         inset.hist(x=(expr[expr > 0], expr[expr < 0]),
                    bins=100, histtype='stepfilled', log=True,
-                   color=('blue', 'red'), alpha=0.4, label=('pos', 'neg'))
+                   color=['blue', 'red'], alpha=0.4, label=['pos', 'neg'])
         inset.set_title('Expressions', fontsize='small')
         inset.tick_params(direction='in', labelsize='x-small', pad=1.2)
         inset.set_ylim(bottom=0.8, top=None)
@@ -233,7 +233,7 @@ class PhenotypePlotter:
         self._set_limits(bars, dots, ys, labels, xmax)
         self._plot_inset_expressions_hist(bars, expressions)
 
-        title = f'{title or phenotype.name} (thresh={thresh})'
+        #title = f'{title or phenotype.name} (thresh={thresh})'
         fig.suptitle(title, fontsize=16)
         return fig, bars
 
