@@ -44,6 +44,7 @@ def build_patient_curves(df, spec, resolution='D'):
     for mode, func in spec.items():
         data = df.loc[df['mode'] == mode]
         data = data.set_index('date')
+        data = data.sort_index()
         result = func(data, grid)
         curves[mode] = result
     out = pd.concat(curves, axis=1, names=['mode', 'channel'])
