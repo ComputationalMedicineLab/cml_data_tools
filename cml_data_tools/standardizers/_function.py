@@ -442,7 +442,7 @@ class Standardizer:
 
     * if the channel is empty (mean is NaN or var is 0), then the function is
       the "identity" function
-    * if the channel is nearly constant, then the function is "linear", i.e. no
+    * if the channel is nearly constant, then the function is "standard" and no
       scale is applied but values are shifted by the channel min
     * if the channel has over 1% negative values, the "log" param is ignored
       but the function is "gelman" (i.e. the scale factor is `2 * stdev`)
@@ -545,7 +545,7 @@ class Standardizer:
                     func = AffineTransform()
                 elif ((st.curve_max - st.curve_min) <
                       1e-6 * (st.curve_max + st.curve_min)):
-                    params['computed_kind'] = 'linear'
+                    params['computed_kind'] = 'standard'
                     func = AffineTransform(shift=st.curve_min)
                 elif st.n_neg > 0.01 * st.base_total:
                     scale = np.sqrt(st.base_var) * 2
@@ -560,6 +560,9 @@ class Standardizer:
                     params['scale'] = scale
                     params['computed_kind'] = 'gelman'
                     func = AffineTransform(scale, shift, log=log, eps=eps)
+
+            else:
+                raise RuntimeError(f'Unknown standardizer kind: {kind}')
 
             self._functions[(mode, channel)] = func
             self._parameters[(mode, channel)] = params
